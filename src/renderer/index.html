@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+    <title>Reimagine Render Engine</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark">SL</span>
+        <div>
+          <h1>Reimagine Render Engine</h1>
+          <p>Sidma Labs · Architectural wireframe to photorealistic render</p>
+        </div>
+      </div>
+      <div id="status-pill" class="status-pill idle">Ready</div>
+    </header>
+
+    <main class="workspace">
+      <!-- Left Sidebar -->
+      <aside class="panel panel-left">
+        <section class="control-section">
+          <label class="section-label" for="texture-prompt">Texture Prompt</label>
+          <textarea
+            id="texture-prompt"
+            rows="6"
+            placeholder="Describe materials, atmosphere, renderer settings..."
+          ></textarea>
+        </section>
+
+        <section class="control-section">
+          <span class="section-label">Style Reference</span>
+          <div id="style-dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload style reference image">
+            <input id="style-input" type="file" accept="image/*" hidden />
+            <div class="dropzone-placeholder">
+              <span class="dropzone-icon">+</span>
+              <span>Drop or click to upload style reference</span>
+            </div>
+            <img id="style-preview" class="dropzone-preview hidden" alt="Style reference preview" />
+          </div>
+        </section>
+
+        <section class="control-section">
+          <span class="section-label">Style Preset</span>
+          <div id="style-presets" class="tag-group" data-single="true"></div>
+        </section>
+
+        <section class="control-section">
+          <span class="section-label">Elements</span>
+          <div id="elements-tags" class="tag-group" data-single="false"></div>
+        </section>
+
+        <section class="control-section">
+          <span class="section-label">Lighting</span>
+          <div id="lighting-tags" class="tag-group" data-single="true"></div>
+        </section>
+
+        <button id="generate-btn" class="btn btn-primary">Generate</button>
+      </aside>
+
+      <!-- Middle Canvas -->
+      <section class="panel panel-center">
+        <div class="panel-header">
+          <h2>Input</h2>
+          <button id="advanced-toggle" class="btn btn-ghost" aria-expanded="false">
+            Advanced Controls
+          </button>
+        </div>
+
+        <div id="base-dropzone" class="canvas-dropzone" tabindex="0" role="button" aria-label="Upload base wireframe">
+          <input id="base-input" type="file" accept="image/*" hidden />
+          <div class="canvas-placeholder">
+            <span class="canvas-icon">⌁</span>
+            <p>Upload architectural sketch / wireframe</p>
+            <span class="hint">PNG, JPG, WEBP</span>
+          </div>
+          <img id="base-preview" class="canvas-preview hidden" alt="Base wireframe preview" />
+        </div>
+
+        <div id="advanced-controls" class="advanced-controls hidden">
+          <div class="field-grid">
+            <label>
+              Sampler
+              <select id="sampler-name">
+                <option value="euler" selected>euler</option>
+                <option value="euler_ancestral">euler_ancestral</option>
+                <option value="heun">heun</option>
+                <option value="dpm_2">dpm_2</option>
+                <option value="dpmpp_2m">dpmpp_2m</option>
+              </select>
+            </label>
+            <label>
+              Steps
+              <input id="steps" type="number" min="1" max="50" value="4" />
+            </label>
+            <label>
+              Seed
+              <input id="seed" type="number" placeholder="Random" />
+            </label>
+            <label>
+              CFG Scale
+              <input id="cfg" type="number" min="0" max="20" step="0.1" value="1.0" />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Canvas -->
+      <section class="panel panel-right">
+        <div class="panel-header">
+          <h2>Output</h2>
+          <button id="export-btn" class="btn btn-secondary" disabled>Export</button>
+        </div>
+
+        <div id="output-viewer" class="canvas-viewer">
+          <div class="canvas-placeholder">
+            <span class="canvas-icon">◈</span>
+            <p>Generated render appears here</p>
+          </div>
+          <img id="output-preview" class="canvas-preview hidden" alt="Generated render" />
+          <div id="output-loading" class="output-loading hidden">
+            <div class="spinner"></div>
+            <span>Rendering on RunPod GPU...</span>
+          </div>
+        </div>
+
+        <div class="history-section">
+          <div class="history-header">
+            <span class="section-label">History</span>
+          </div>
+          <div id="history-strip" class="history-strip"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

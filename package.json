@@ -1,0 +1,24 @@
+{
+  "name": "reimagine-render-engine",
+  "version": "0.1.0",
+  "description": "Sidma Labs Reimagine Render Engine — architectural wireframe to photorealistic render",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "convert-workflow": "node scripts/convert-workflow.js"
+  },
+  "keywords": [
+    "electron",
+    "runpod",
+    "comfyui",
+    "architecture",
+    "ai-render"
+  ],
+  "author": "Sidma Labs",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "electron": "^33.2.0"
+  }
+}
