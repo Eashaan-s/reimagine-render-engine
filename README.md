@@ -1,4 +1,4 @@
-# Sidma Labs Reimagine Render Engine
+# Reimagine Render Engine
 
 Electron desktop app that sends architectural wireframes and style references to a RunPod ComfyUI worker (`qwen_image_edit_2511` + Lightning LoRA) and displays photorealistic renders.
 
@@ -64,3 +64,7 @@ UI layout follows the [Render Engine design](https://www.figma.com/design/1ykPlN
 1. Export an updated workflow from ComfyUI into `workflows/workflow.json`
 2. Run `npm run convert-workflow`
 3. Confirm nodes **368**, **370**, **371**, and **377** still exist
+
+## Capstone progress snapshots
+
+The app in this repository root is the **final (100%)** RunPod product. Earlier milestones used for course demos live under [`progress/`](progress/) (`30-ui-shell`, `50-workflow-mapping`, `70-runpod-generate`). Course write-ups: [`docs/literature-survey.md`](docs/literature-survey.md), logbook ([`docs/logbook-8-weeks.md`](docs/logbook-8-weeks.md) or plain [`docs/logbook.txt`](docs/logbook.txt)), [`docs/system-architecture.md`](docs/system-architecture.md) (full), [`docs/system-architecture-70.md`](docs/system-architecture-70.md) (review copy, no vendor config).

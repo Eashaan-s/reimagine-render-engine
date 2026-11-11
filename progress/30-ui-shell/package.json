@@ -1,0 +1,14 @@
+{
+  "name": "reimagine-progress-30-ui-shell",
+  "version": "0.1.0",
+  "description": "Capstone 30% — Reimagine Render Engine UI shell (no RunPod)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "Capstone project",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

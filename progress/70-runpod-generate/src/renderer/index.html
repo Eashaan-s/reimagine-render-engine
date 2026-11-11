@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Reimagine Render Engine</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- Custom title bar -->
+    <header class="titlebar" id="titlebar">
+      <div class="brand">
+        <span class="brand-title">Reimagine Render Engine</span>
+      </div>
+      <div class="window-controls">
+        <button id="win-min" class="win-btn" title="Minimize" aria-label="Minimize">&#x2013;</button>
+        <button id="win-max" class="win-btn" title="Maximize" aria-label="Maximize">&#x25A1;</button>
+        <button id="win-close" class="win-btn win-close" title="Close" aria-label="Close">&#x2715;</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <!-- LEFT: Generate Style & Prompt -->
+      <section class="panel">
+        <div class="panel-title">Generate Style &amp; Prompt</div>
+        <div class="panel-body panel-left-body">
+          <div class="field">
+            <label class="field-label" for="texture-prompt">Texture Prompt</label>
+            <textarea
+              id="texture-prompt"
+              rows="5"
+              placeholder="Change the rendering in image 1 to the style in image 2..."
+            ></textarea>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Reference Image</span>
+            <div
+              id="style-dropzone"
+              class="dropzone ref-dropzone"
+              tabindex="0"
+              role="button"
+              aria-label="Upload reference image"
+            >
+              <input id="style-input" type="file" accept="image/*" hidden />
+              <div class="dropzone-placeholder">
+                <span class="dropzone-icon">+</span>
+                <span>Drop or click to add reference</span>
+              </div>
+              <img id="style-preview" class="dropzone-preview hidden" alt="Reference preview" />
+              <button id="style-clear" class="img-clear hidden" title="Remove reference" aria-label="Remove reference">&#x2715;</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Style Preset</span>
+            <div id="style-presets" class="multiselect" data-placeholder="Select style presets"></div>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Tags</span>
+            <div id="tags" class="multiselect" data-placeholder="Select tags"></div>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Lighting Style</span>
+            <div id="lighting" class="multiselect" data-placeholder="Select lighting style"></div>
+          </div>
+
+          <button id="generate-btn" class="btn btn-primary">Generate</button>
+        </div>
+      </section>
+
+      <!-- MIDDLE: Input -->
+      <section class="panel">
+        <div class="panel-title">Input</div>
+        <div class="panel-body">
+          <div
+            id="base-dropzone"
+            class="image-stage"
+            tabindex="0"
+            role="button"
+            aria-label="Upload base render"
+          >
+            <input id="base-input" type="file" accept="image/*" hidden />
+            <div class="canvas-placeholder">
+              <span class="canvas-icon">&#x2301;</span>
+              <p>Upload architectural render / wireframe</p>
+              <span class="hint">PNG, JPG, WEBP</span>
+            </div>
+            <img id="base-preview" class="stage-img hidden" alt="Base render preview" />
+            <button id="base-clear" class="img-clear hidden" title="Remove image" aria-label="Remove image">&#x2715;</button>
+          </div>
+
+          <div class="stage-meta">
+            <div class="meta-lines">
+              <div>Render Resolution: <span id="input-res">&mdash;</span></div>
+              <div>File Name: <span id="input-name">&mdash;</span></div>
+            </div>
+            <button id="import-btn" class="btn btn-soft">
+              <span class="btn-ico">&#x21A5;</span> Import
+            </button>
+          </div>
+
+          <div class="controls-block">
+            <span class="field-label">Controls</span>
+            <div class="segmented" id="controls-mode" role="tablist">
+              <button type="button" class="seg active" data-mode="simple">Simple</button>
+              <button type="button" class="seg" data-mode="advance">Advance</button>
+            </div>
+
+            <div id="advanced-controls" class="adv-grid hidden">
+              <label>
+                Sampler
+                <select id="sampler-name">
+                  <option value="euler" selected>Euler</option>
+                  <option value="euler_ancestral">Euler Ancestral</option>
+                  <option value="heun">Heun</option>
+                  <option value="dpm_2">DPM 2</option>
+                  <option value="dpmpp_2m">DPM++ 2M</option>
+                </select>
+              </label>
+              <label>
+                Steps
+                <input id="steps" type="number" min="1" max="50" value="4" />
+              </label>
+              <label>
+                Seed
+                <input id="seed" type="number" placeholder="-1" />
+              </label>
+              <label>
+                CFG Scale
+                <input id="cfg" type="number" min="0" max="20" step="0.1" value="1.0" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Output -->
+      <section class="panel">
+        <div class="panel-title">Output</div>
+        <div class="panel-body">
+          <div id="output-viewer" class="image-stage">
+            <div class="canvas-placeholder">
+              <span class="canvas-icon">&#x25C8;</span>
+              <p>Generated render appears here</p>
+            </div>
+            <img id="output-preview" class="stage-img hidden" alt="Generated render" />
+            <div id="output-loading" class="output-loading hidden">
+              <div class="spinner"></div>
+              <span>Rendering on RunPod GPU...</span>
+            </div>
+          </div>
+
+          <div class="stage-meta">
+            <div class="meta-lines">
+              <div>Render Resolution: <span id="output-res">&mdash;</span></div>
+              <div>File Name: <span id="output-name">&mdash;</span></div>
+              <div>Render Time: <span id="output-time">&mdash;</span></div>
+            </div>
+            <button id="export-btn" class="btn btn-soft" disabled>
+              <span class="btn-ico">&#x21A7;</span> Export
+            </button>
+          </div>
+
+          <div class="history-row">
+            <div id="history-strip" class="history-strip"></div>
+            <button id="history-folder" class="history-folder" title="Open renders folder" aria-label="Open renders folder">
+              &#x1F4C1;
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Status bar -->
+    <footer class="statusbar">
+      <div class="status-left">
+        <span class="status-dot idle" id="status-dot"></span>
+        <span id="status-state">Idle</span>
+        <span class="status-sep">|</span>
+        <span id="status-message">Ready for Generation</span>
+      </div>
+    </footer>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

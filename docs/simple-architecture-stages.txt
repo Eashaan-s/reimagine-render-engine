@@ -1,0 +1,87 @@
+SIMPLE ARCHITECTURE — WHOLE RENDERING PROCESS
+Stage-wise (30% → 50% → 70% → 100%)
+Use this on one PPT slide + speak the stages. Keep words simple.
+
+================================================================================
+THE WHOLE PROCESS (ONE SENTENCE)
+================================================================================
+The user gives a drawing. The app packs it into a job. A GPU worker paints a photoreal picture. The app shows that picture.
+
+================================================================================
+SIMPLE DIAGRAM (DRAW 6 BOXES)
+================================================================================
+
+  [1 Drawing]
+       |
+  [2 App window]
+       |
+  [3 Job packer]     ← fills the recipe (nodes 370, 371, 377, 368)
+       |
+  [4 Job file]       ← recipe + pictures
+       |
+  [5 GPU worker]     ← does the actual painting
+       |
+  [6 Output picture] ← user sees / saves PNG
+
+That is the complete rendering process. Nothing else is required to explain it.
+
+================================================================================
+WHAT EACH BOX MEANS
+================================================================================
+1. Drawing     The wireframe or sketch the student uploads.
+2. App window  Three columns: instructions, drawing, result.
+3. Job packer  Copies the drawing, optional style photo, and text into a
+               fixed recipe. It does not invent a new AI model.
+4. Job file    One package the worker can read.
+5. GPU worker  Computer with a graphics chip that runs the image-edit model
+               and returns a photo.
+6. Output      The photo in the right-hand panel, plus Save.
+
+================================================================================
+STAGE-WISE IMPLEMENTATION (WHAT WE BUILT WHEN)
+================================================================================
+
+STAGE A — 30%   “The window works”
+  Built: box 1 and box 2
+  User can open the app and put in a drawing.
+  Generate does not pack a job yet.
+  Proof: import a PNG, see it in Input.
+
+STAGE B — 50%   “The job is packed”
+  Built: box 3 and box 4
+  Generate fills the recipe and can save the job file.
+  Output can show a labeled exhibit (drawing + “job packed, GPU not attached”).
+  Proof: status says Mapped; JSON saved; Export works.
+  Say clearly: this picture is NOT the GPU photo.
+
+STAGE C — 70%   “The client is complete”
+  Built: full path 1 → 2 → 3 → 4, plus Save / history / status
+  The app is ready to hand the job to a worker.
+  The worker (box 5) is the next plug-in for the live photo.
+  Proof: architecture + mapping exhibit + docs.
+
+STAGE D — 100%  “The picture comes back”
+  Built: box 5 and box 6 for real
+  Worker paints the photoreal image; Output shows it.
+  That is the final product (repository root).
+  Not required to name the cloud vendor on the interim slide.
+
+================================================================================
+ONE SLIDE YOU CAN COPY
+================================================================================
+Title: Simple architecture (end-to-end)
+
+Drawing → App window → Job packer → Job file → GPU worker → Output photo
+
+Implementation
+• 30%  Window + import
+• 50%  Job packer (recipe 370 / 371 / 377 / 368)
+• 70%  Full client; ready for the worker
+• 100% Worker returns the photoreal PNG
+
+Caption: 70% today = everything except the live GPU painting.
+
+================================================================================
+30-SECOND SPEECH
+================================================================================
+“The rendering process is a pipeline. First the user gives a drawing. Second the window collects style and text. Third we pack a job using four fixed slots: drawing, style, words, sampler. Fourth a GPU worker would paint the photoreal image. Fifth we show it on the right. We have finished stages one to three and the packing. Stage four — the worker painting — is the last step.”

@@ -1,0 +1,486 @@
+Reimagine Render Engine
+Architectural Drawing to Photorealistic Concept Preview
+2025-2026
+
+Project Report submitted in the partial fulfilment
+of
+B.Tech
+In
+Electronics and Telecommunication
+By
+(Student Name 1) (Roll No.)
+(Student Name 2) (Roll No.)
+(Student Name 3) (Roll No.)
+Under the supervision of
+(Guide Name)
+SVKM’s NMIMS University
+(Deemed-to-be University)
+
+================================================================================
+CERTIFICATE
+================================================================================
+This is to certify that the project entitled “Reimagine Render Engine: Architectural Drawing to Photorealistic Concept Preview” has been done by (Student Names) under my guidance and supervision and has been submitted in partial fulfilment of the degree of B.Tech in Electronics and Telecommunication of MPSTME, SVKM’s NMIMS (Deemed-to-be University), Mumbai, India.
+
+___________________
+Project mentor (name and signature)          Examiner (name and signature)
+Internal Guide
+Date:
+Place: Mumbai
+(HoD) (name and signature)
+
+================================================================================
+ACKNOWLEDGEMENT
+================================================================================
+We would like to express our deepest gratitude to everyone who contributed to the successful completion of this project. First and foremost, we thank our project supervisor, (Guide Name), for invaluable guidance, encouragement, and support throughout this journey. Their expertise and insights were instrumental in shaping our understanding of image-to-image translation and in framing a designer-facing desktop system rather than a new generative-model paper.
+
+We also extend our thanks to the faculty members of the Electronics and Telecommunication Department at Mukesh Patel School of Technology Management and Engineering for the knowledge, resources, and facilities essential to this work. We are grateful to our peers for constructive feedback during staged reviews (user-interface shell, workflow mapping, and full client), and to our families for encouragement during the implementation phases.
+
+Student Names:
+NAME    ROLL NO.    SAP ID
+(fill)  (fill)      (fill)
+
+================================================================================
+ABSTRACT
+================================================================================
+Architects, architecture students, and early-stage designers often need a photorealistic concept preview of an existing drawing, but producing one normally requires 3-D modelling and a traditional rendering pipeline. Existing generative-image research provides image-to-image translation, latent diffusion, spatial control, and instruction-based editing, yet it does not package those capabilities as a single desktop job that a designer can run without opening a node graph.
+
+This project presents Reimagine Render Engine, a Windows desktop application that turns a required architectural drawing or wireframe, an optional style photograph, and an instruction assembled from interface chips and free text into one frozen node-based workflow. The job is executed on a pretrained Qwen Image Edit graph through a hosted or local GPU worker and returns a PNG preview together with its seed and exact prompt. The drawing is resampled to a three-megapixel Lanczos canvas before encoding. Defaults on the sampler are four steps, CFG 1.0, and Euler.
+
+The work is an application- and workflow-level contribution. It does not train new neural networks, invent diffusion algorithms, build 3-D geometry, or replace BIM and construction documentation. Results are assessed qualitatively for geometric faithfulness, style transfer, instruction following, and usefulness as a concept preview.
+
+Index Terms: image-to-image translation, diffusion models, image editing, architectural visualization, instruction-conditioned editing, reference-conditioned editing, desktop application, frozen workflow, concept rendering.
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+Topics
+List of Figures
+List of Tables
+Chapter 1 Introduction
+  1.1 Background of the Project
+  1.2 Motivation and Scope
+  1.3 Problem Statement
+  1.4 Salient Contribution
+Chapter 2 Literature Survey
+  2.1 Introduction to Overall Topic
+  2.2 Exhaustive Literature Survey and Gap Analysis
+Chapter 3 Methodology and Implementation
+  3.1 Proposed System
+  3.2 System Architecture
+  3.3 Computing and Deployment Platform
+  3.4 Software Implementation
+  3.5 Code Implementation
+Chapter 4 Result and Analysis
+  4.1 Test Methodology and Evaluation Standards
+  4.2 Investigation of Application Behaviour
+  4.3 Discussion, Inferences and Contributions
+Chapter 5 Advantages, Limitations and Applications
+  5.1 Advantages
+  5.2 Limitations
+  5.3 Applications
+Chapter 6 Conclusion and Future Scope
+  6.1 Conclusion
+  6.2 Future Scope
+References
+
+================================================================================
+LIST OF FIGURES
+================================================================================
+Fig. No.    Name of the figure
+1           Overview flowchart: drawing, optional style, and instruction to PNG
+2           System architecture: renderer, preload, main process, GPU worker
+3           Frozen workflow and node mapping (370, 371, 377, 368)
+4           Application interface (three-column UI)
+5           Instruction-only edit (example: night sky)
+6           Stage-wise results: wireframe, reference, generated output
+7           Same wireframe rendered under different scenarios
+
+(Paste Fig. 1–7 from the IEEE v2 Word file or from live application screenshots.)
+
+================================================================================
+LIST OF TABLES
+================================================================================
+Table No.   Name of the table
+1           Comparative literature analysis (method, literature gap, gap covered by the application)
+2           Frozen ComfyUI node mapping
+3           Software and deployment specifications
+4           Qualitative evaluation criteria
+
+================================================================================
+CHAPTER 1
+INTRODUCTION
+================================================================================
+
+1.1 BACKGROUND OF THE PROJECT TOPIC
+
+Architectural visualization has long sat between two practices. On one side, a student or designer produces a 2-D drawing, wireframe, or early massing image that already encodes composition, openings, and spatial arrangement. On the other side, a photoreal image suitable for a concept discussion is typically obtained only after 3-D modelling, material assignment, lighting setup, and a conventional render. That gap is costly in time and skill at the early stage of design, when many material and lighting “what if” questions should be cheap to ask.
+
+In parallel, computer vision has moved from paired image-to-image (I2I) translation with conditional GANs to denoising diffusion, latent diffusion, transformer denoisers, spatial adapters, and instruction-following editors. These models can change the appearance of an image while, to varying degrees, preserving layout. They are, however, published as algorithms, training recipes, and inference procedures. They assume a researcher who can run a node graph, write a prompt pair, or fine-tune a network.
+
+Reimagine Render Engine is situated at that intersection. The scientific task is instruction- and reference-conditioned I2I editing, not text-to-image generation from empty noise. The required input is an architectural drawing. An optional second image may supply style. Natural-language guidance is collected from the interface. A frozen ComfyUI graph, already containing a pretrained Qwen Image Edit stack, is filled at four designated nodes and executed on a GPU worker. The user remains in one Windows window and never trains a model.
+
+1.2 MOTIVATION AND SCOPE OF THE REPORT
+
+Motivation. Early design still lives in drawings. Photoreal options currently demand a full visualization pipeline. Generative editors exist, but they are not packaged as a designer job that jointly takes drawing, style photograph, and structured instruction. Architecture students in particular should not be required to operate ComfyUI or a cloud console to obtain a concept preview.
+
+Scope of this report. The report covers the design, implementation, and qualitative evaluation of a complete desktop client:
+- a three-column Electron user interface (instruction, input drawing, output PNG);
+- a secure preload bridge and main process;
+- a job packer that writes a frozen API workflow;
+- hosted or local GPU inference;
+- a three-megapixel Lanczos resolution policy;
+- export and history.
+
+The scope does not include training Qwen, ControlNet, or any other network; construction-accurate geometry; BIM; or a quantitative FID/SSIM/LPIPS study. Staged course deliverables (approximately 30 percent UI shell, 50 percent workflow mapping, 70 percent full client, 100 percent worker returning a PNG) are implementation milestones of the same product, not separate scientific claims.
+
+1.3 PROBLEM STATEMENT
+
+Designers need a fast photoreal preview of an existing architectural drawing under a requested material, lighting, or visual language. Conventional rendering is too heavy for that early question. Research I2I systems each solve a slice of the problem (paired translation, latent generation, spatial maps, instruction following) but leave a practical gap:
+
+- the drawing is not treated as a mandatory structural input in a designer UI;
+- a style photograph and a written instruction are rarely first-class together;
+- the user is expected to edit a node graph or invert a latent;
+- evaluation in the literature is photorealism on natural photographs, not whether a signed-off drawing still reads as the same building.
+
+Therefore there is a need for an intelligent, usable, and documented desktop system that packages drawing plus optional style plus instruction as one auditable job, runs a pretrained image-edit graph, and returns a PNG that can be compared, exported, and discussed. Reimagine Render Engine addresses that need at the application layer.
+
+1.4 SALIENT CONTRIBUTION
+
+The salient contributions of this report are as follows:
+
+1. Designer-facing I2I job, not a new foundation model.
+   The application makes a drawing mandatory, a style image optional, and an instruction explicit. It does not claim to invent diffusion, ControlNet, or Qwen Image Edit.
+
+2. Frozen workflow with a small overwrite surface.
+   Only ComfyUI nodes 370 (base image), 371 (style image), 377 (assembled prompt), and 368 (sampler) are written per request. The remainder of the graph stays fixed, which improves reproducibility and keeps the UI from becoming a model-engineering console.
+
+3. Auditable prompt assembly.
+   Style chips, scene tags, lighting chips, and free text are concatenated with a lead sentence into one string stored with the seed. The generation request can be inspected later.
+
+4. Defined resolution policy.
+   ImageScaleToTotalPixels at three megapixels with Lanczos sets a 2K-class working canvas. The UI reports the true width and height of the returned PNG. The work does not claim 8K pixel output.
+
+5. Split between desktop and GPU worker.
+   The same logical job runs on a hosted GPU endpoint or local ComfyUI. The renderer never talks to the GPU directly; Electron’s preload API is the only bridge.
+
+6. Qualitative, architecture-oriented evaluation.
+   Success is defined as structure preserved, style or instruction visible, and usefulness as a concept preview—not as an ImageNet FID score.
+
+================================================================================
+CHAPTER 2
+LITERATURE SURVEY
+================================================================================
+
+2.1 INTRODUCTION TO OVERALL TOPIC
+
+Generative image systems have evolved from paired and unpaired adversarial translation toward diffusion-based synthesis and editing. For architecture, the relevant scientific setting is I2I: one representation of a scene (a drawing) is mapped to another (a photoreal preview). Text-to-image from pure noise is a different task because it does not start from the designer’s drawing.
+
+The literature can be grouped as follows:
+
+- Problem foundation: pix2pix established paired I2I with a conditional GAN; CycleGAN addressed unpaired domain transfer.
+- Generative backbone: denoising diffusion probabilistic models introduced the reverse noising process; latent diffusion moved that process into a VAE latent with cross-attention; Diffusion Transformers replaced the U-Net denoiser with a scalable transformer.
+- Control and editing: ControlNet added spatial maps to frozen text-to-image models; Prompt-to-Prompt edited by injecting cross-attention; SDEdit noised an RGB guide and denoised it; Palette unified restoration-style I2I; InstructPix2Pix learned to follow a written instruction given a photograph.
+- Deployed stack of this project (consumed, not trained): Qwen2.5-VL as a vision-language condition tower, Qwen-Image / Qwen Image Edit as the edit model, and LoRA / Lightning adapters for few-step sampling.
+
+This body of work supplies the prior that a desktop client can call. It does not, by itself, specify a three-column Windows application, a frozen four-node mapping, or a designer evaluation protocol.
+
+2.2 EXHAUSTIVE LITERATURE SURVEY AND GAP ANALYSIS
+
+The following survey paraphrases the research papers used in this capstone. Each paragraph states the method, a limit, and why the paper matters to Reimagine Render Engine. Table 1 then compares them on method, literature gap, and the gap covered by the application.
+
+1. Isola et al., pix2pix (CVPR 2017)
+   Paired conditional GAN mapping from one image domain to another (edges or labels to photo). Needs aligned pairs, has limited diversity, and has no language channel. This project inherits the I2I problem statement (drawing to photoreal) without collecting pairs or training a GAN.
+
+2. Zhu et al., CycleGAN (ICCV 2017)
+   Unpaired translation with cycle consistency. Weak when geometry must change; no instruction. This project instead assumes a specific drawing and an optional corresponding style photo in one job.
+
+3. Ho, Jain, and Abbeel, DDPM (NeurIPS 2020)
+   Pixel-space denoising diffusion with a noise-prediction objective and a long reverse chain. Unconditional or class-level; not I2I; not a client. The GPU worker’s sampler is a descendant of this reverse process; the students do not train a DDPM.
+
+4. Rombach et al., Latent Diffusion (CVPR 2022)
+   Diffusion in a VAE latent with cross-attention. Made high-resolution synthesis practical. Weak native layout versus later adapters; no designer UI. This application VAE-encodes a scaled drawing and hides the latent graph from the user.
+
+5. Peebles and Xie, DiT (ICCV 2023)
+   Transformer denoiser on latent patches; quality scales with compute on ImageNet. Class-conditional, not instruction-plus-drawing. Explains treating a large transformer-style edit stack as an inference service.
+
+6. Zhang, Rao, and Agrawala, ControlNet (ICCV 2023)
+   Frozen text-to-image U-Net plus a trainable spatial copy joined by zero convolutions. Layout comes from edge, depth, or pose maps, not from a drawing-plus-style desktop. This project makes the drawing mandatory as image 1 without training ControlNet.
+
+7. Meng et al., SDEdit (ICLR 2022)
+   Noise an RGB guide, then reverse SDE. No language; not architectural plans. This project uses drawing-conditioned I2I plus an explicit instruction string.
+
+8. Saharia et al., Palette (SIGGRAPH 2022)
+   Unified conditional diffusion for colorization, inpainting, uncropping, and JPEG restoration. No free-form language; ImageNet photos. This project is language- and reference-conditioned architectural preview.
+
+9. Hertz et al., Prompt-to-Prompt (2022)
+   Training-free attention injection; caption rewrite. Strongest on generated images; inversion limits; no second reference. This project preserves identity through a frozen edit graph and a stored prompt and seed.
+
+10. Brooks, Holynski, and Efros, InstructPix2Pix (CVPR 2023)
+    Instruction plus one photograph; synthetic training pairs; dual guidance. Weak geometry; no second style image; not a designer client. This project adds an optional style photo and chips, and runs without per-image inversion.
+
+Table 1 — Comparative analysis (literature gap and gap covered by the application)
+
+Ref. | Paper | Core method | Literature gap | Gap covered by the application
+[1] DDPM | Reverse denoising in pixel space | No I2I, no drawing, no client | Worker engine only; client sends a drawing-conditioned job
+[2] LDM | Latent U-Net plus cross-attention | No designer UI; weak native layout | Latent I2I of a scaled drawing packed in the desktop
+[3] DiT | Transformer denoiser, ImageNet | Not instruction or drawing I2I | Large edit stack as a service; client packs the job
+[4] ControlNet | Spatial maps on frozen T2I | Maps, not a drawing-plus-style UI | Drawing as mandatory image 1; no ControlNet training
+[5] SDEdit | Noise then reverse SDE on RGB | No language; not plans | Drawing I2I plus assembled instruction
+[6] Palette | Restoration-style I2I | No language; not drawings | Language- and reference-conditioned preview
+[7] Prompt-to-Prompt | Attention injection | Inversion; no second image; no UI | Frozen graph plus stored prompt and seed
+[8] InstructPix2Pix | Photo plus sentence | No style photo; not architecture desktop | Drawing plus optional style plus chips
+pix2pix | Paired GAN I2I | Pairs, no language | Same I2I problem without training a GAN
+CycleGAN | Unpaired domains | No correspondence, no instruction | Specific drawing plus optional matched style
+
+How to read Table 1. The literature-gap column is what that paper leaves open. The last column is only the systems slice this desktop addresses. The project does not close training or benchmark gaps of those papers.
+
+================================================================================
+CHAPTER 3
+METHODOLOGY AND IMPLEMENTATION
+================================================================================
+
+3.1 PROPOSED SYSTEM
+
+The proposed system is a Windows desktop application named Reimagine Render Engine. The user:
+
+1. Imports a required architectural drawing (PNG, JPG, or WEBP) into the Input panel.
+2. Optionally drops a style or reference photograph.
+3. Selects style, tag, and lighting chips and types a texture prompt.
+4. Optionally opens Advanced controls (sampler, steps, CFG, seed). Defaults: Euler, 4 steps, CFG 1.0, random seed.
+5. Clicks Generate.
+6. Reviews the PNG in Output (resolution, time, seed), compares history (up to 24 entries), and exports a file.
+
+Scientifically this is one I2I job: image 1 is structure, image 2 is appearance if present, and the assembled string is semantics. If the style image is omitted, the job builder removes the style LoadImage node so the worker does not load a missing file.
+
+3.2 SYSTEM ARCHITECTURE
+
+The desktop follows Electron’s process split, analogous to a hardware report’s block diagram.
+
+Layer 1 — Renderer (src/renderer/)
+HTML, CSS, and JavaScript. Three columns: Generate Style and Prompt; Input; Output. Images live in memory as data URLs. The page cannot use Node.js.
+
+Layer 2 — Preload bridge (preload.js)
+contextBridge exposes window.reimagine: generateRender, exportImage, getConfig, openRendersFolder, windowControl, onGenerationProgress.
+
+Layer 3 — Main process (main.js)
+Creates the window, validates the base image, chooses backend (hosted GPU if credentials exist, else local ComfyUI, unless RENDER_BACKEND is forced), calls the job packer, and handles save dialogs.
+
+Layer 4 — Job packer (src/services/workflowBuilder.js)
+Clones workflows/workflow-api.json and writes nodes 370, 371, 377, and 368.
+
+Layer 5 — Inference worker
+Hosted path: POST workflow and images, poll status. Local path: upload images, queue prompt, poll history, download PNG. Same conceptual generate(workflow, images) interface.
+
+Fig. 2 (paste from IEEE v2) shows this architecture.
+
+3.3 COMPUTING AND DEPLOYMENT PLATFORM
+
+Unlike a wearable hardware project, this capstone’s “platform” is a student Windows PC plus a GPU worker.
+
+Component | Role
+Windows 10/11 PC | Runs the Electron client
+Electron 33 | Desktop shell
+electron-builder (NSIS) | Installer; appId com.reimagine.renderengine
+Hosted GPU worker (optional) | Executes the ComfyUI graph; student does not train weights
+Local ComfyUI (optional) | http://127.0.0.1:8188 or COMFYUI_URL; can be launched via COMFYUI_PATH
+dotenv / .env | RUNPOD_API_KEY, RUNPOD_ENDPOINT_ID, RENDER_BACKEND, model filename overrides
+
+No microcontroller, camera, or haptic hardware is part of this product. The GPU is an inference appliance, not a research contribution.
+
+3.4 SOFTWARE IMPLEMENTATION
+
+Table 3 — Detailed software specifications
+
+Component / feature | Description / specification
+Desktop | Electron 33; frameless window; custom min/max/close
+UI | Three-column layout; multi-select chips (style, tags, lighting); Simple / Advanced
+IPC | window.reimagine via contextBridge
+Job mapping | workflowBuilder.js; workflows/workflow-api.json from workflow.json via npm run convert-workflow
+HTTP | axios (hosted); fetch (local ComfyUI)
+Prompt assembly | assemblePrompt: lead sentence plus chips plus texture prompt
+Frozen nodes | 370 LoadImage base; 371 LoadImage style; 377 TextEncodeQwenImageEditPlus; 368 KSampler
+Resolution | ImageScaleToTotalPixels, megapixels 3, Lanczos, resolution_steps 1
+Deployed model (not trained here) | qwen_image_edit_2511; Qwen2.5-VL CLIP; Lightning LoRA; tiled VAE decode
+Sampler defaults | Euler, 4 steps, CFG 1.0, scheduler simple, denoise 1
+Output | PNG base64; seed; prompt; history up to 24; native export dialog
+
+3.5 CODE IMPLEMENTATION
+
+The core of the application is not a microcontroller sketch. It is the mapping from UI state to a frozen graph. Two fragments illustrate the methodology.
+
+Prompt assembly (conceptual).
+If a style image is present, the lead sentence is: Replace the rendering in image 1 with the style in image 2.
+If not: Transform the architectural rendering in image 1 into a photorealistic render.
+Non-empty style presets, element tags, lighting choices, and the texture prompt are appended, separated by blank lines. That string is written to node 377.
+
+Node overwrite (conceptual).
+The packer clones the API JSON. It sets node 370’s image to the base filename, node 371’s image to the style filename when present (otherwise node 371 and encoder image2 inputs are deleted), node 377’s prompt to the assembled string, and node 368’s seed, steps, CFG, and sampler name. Scheduler and denoise remain at graph defaults.
+
+This is the analogue, in a software capstone, of “only these pins and these functions change at runtime.”
+
+End-to-end procedure (ten steps):
+1. Application initialization and status (ready or setup).
+2. Drawing import; Generate blocked if missing.
+3. Optional reference image.
+4. Instruction construction.
+5. Sampler configuration (Simple or Advanced).
+6. Workflow construction.
+7. Backend resolution (hosted or local).
+8. GPU inference on the frozen Qwen Image Edit graph.
+9. PNG, seed, prompt, resolution, and time shown; history updated.
+10. Export and comparison.
+
+Security. The renderer cannot reach the disk or the GPU except through named preload functions.
+
+================================================================================
+CHAPTER 4
+RESULT AND ANALYSIS
+================================================================================
+
+4.1 TEST METHODOLOGY AND EVALUATION STANDARDS
+
+The haptic-belt reference report evaluates sensors and YOLO detections with tables of hardware tests. This application is a preview client, not a detection benchmark. It does not compute FID, Inception Score, SSIM, or LPIPS. No such numbers are invented.
+
+Table 4 — Qualitative evaluation criteria
+
+Criterion | Question asked of each PNG | Pass intuition
+Geometric faithfulness | Does the output still read as the same building (masses, openings, floors, alignment)? | Structure from the drawing survives photoreal decoding
+Style and material transfer | Do the reference photo or style chips appear in materials, palette, and mood? | Appearance channel is visible
+Instruction following | Do lighting tags, scene tags, and free text show in the image? | Assembled prompt is auditable via stored string and seed
+Concept-preview usefulness | Would this PNG help an early design conversation? | Photorealism that changes the design is a fail
+Resolution reporting | Does Output show natural width times height of the file? | 3 MP working budget, not 8K claim
+Functional path | Does Generate complete from import to export? | UI, IPC, packer, and worker operate as specified
+
+Possible future quantitative tests (not performed in this report): SSIM or SSIM on edge maps between drawing and output; LPIPS between output and style photograph; a small expert rubric.
+
+4.2 INVESTIGATION OF APPLICATION BEHAVIOUR
+
+Functional result.
+The implemented application completes the intended path. A drawing can be imported, a style photograph added, chips and texture text assembled, and a PNG returned and exported. Seed, prompt, elapsed time, and pixel size are displayed. History holds up to 24 results.
+
+Resolution result.
+The frozen graph resamples the drawing to about 3,000,000 pixels with Lanczos before VAE encoding, preserving aspect ratio (for example about 2000 by 1500 for 4:3, about 2309 by 1299 for 16:9). This is a 2K-class budget: above Full HD, below 4K, far below true 8K. Words such as 8k in baked prompt language are aesthetic, not a pixel count.
+
+Staged visual result (Fig. 6).
+For several wireframes: (a) required drawing, (b) optional reference, (c) generated preview. Massing and floor levels of the wireframe are intended to remain; materials, landscape, sky, and lighting follow the reference and instruction.
+
+Same wireframe, different scenarios (Fig. 7).
+One drawing is held fixed while lighting, tags, free text, or reference change. Geometry should stay consistent while setting and mood change, showing that output is controlled by instruction and reference rather than being a single baked render.
+
+Instruction-only example (Fig. 5).
+An existing render can be edited by instruction (for example, change the sky to night sky) while building and site remain.
+
+These observations are qualitative. They are not a controlled human study and must not be written as percentage accuracy tables unless such a study is later run.
+
+4.3 DISCUSSION, INFERENCES AND CONTRIBUTIONS
+
+Inference 1. A pretrained image-edit graph can be wrapped so that node-graph complexity is hidden while the main user-facing variables remain controlled.
+
+Inference 2. Collapsing chips, free text, and two images into one prompt string makes the request auditable, which research UIs that hide state do not provide.
+
+Inference 3. Making the drawing mandatory is what keeps the task as I2I. Without that constraint the product would collapse into unconstrained text-to-image and would not serve architectural preview.
+
+Inference 4. The literature already contains the generative mechanisms. The remaining gap this report is entitled to claim is systems and interaction: one designer job, frozen mapping, desktop plus worker.
+
+Contribution relative to the haptic-belt style of report.
+Where that report’s contribution is multi-sensor fusion and haptic cues, this report’s contribution is multi-condition fusion (drawing, style, instruction) into a frozen inference graph and a usable Windows client.
+
+================================================================================
+CHAPTER 5
+ADVANTAGES, LIMITATIONS AND APPLICATIONS
+================================================================================
+
+5.1 ADVANTAGES
+
+- Single-window workflow. The designer does not open ComfyUI, a 3-D tool, or a training notebook.
+- Mandatory structure channel. The drawing is required, so the task stays I2I.
+- Optional appearance channel. A style photograph can be omitted without breaking the graph.
+- Explicit instruction. Chips plus free text become one stored prompt.
+- Frozen overwrite surface. Only four nodes change per job, which aids documentation and staged course demos.
+- Backend independence. Hosted GPU or local ComfyUI share the same job shape.
+- Repeatability aids. Seed, prompt, resolution, time, and history support comparison of scenarios.
+- Defined resolution budget. Three-megapixel Lanczos is an implementation constraint that can be stated honestly.
+- Course-visible staging. 30 / 50 / 70 / 100 percent folders match how the product was reviewed.
+
+5.2 LIMITATIONS
+
+- Concept preview, not construction documents, BIM, or geometrically verified 3-D rendering.
+- Fixed three-megapixel working canvas; not an unrestricted 4K/8K renderer.
+- Frozen graph: users cannot rewire nodes from the UI.
+- No automatic SSIM, LPIPS, or FID in the application.
+- Quality inherits the pretrained Qwen Image Edit model (geometry drift, counting errors, domain gap from web photos to drawings).
+- Hosted inference depends on network, credentials, and worker availability; local inference depends on a correctly installed ComfyUI and GPU.
+- Few-step Lightning sampling (default four steps) trades quality for latency.
+- No controlled architectural test set or expert user study is reported in this document.
+
+5.3 APPLICATIONS
+
+- Architecture studio concept reviews: quick material and lighting alternatives from a sketch or wireframe.
+- Academic visualization courses: demonstration of I2I without requiring students to operate a node graph.
+- Interior and landscape “what if” previews when a style photograph exists.
+- Design communication with non-technical stakeholders using an exported PNG.
+- Not applicable: statutory drawings, quantity take-off, structural analysis, or final marketing stills that require a physically based 3-D renderer.
+
+================================================================================
+CHAPTER 6
+CONCLUSION AND FUTURE SCOPE
+================================================================================
+
+6.1 CONCLUSION
+
+This report presented Reimagine Render Engine, a Windows desktop application that turns a required architectural drawing, an optional style photograph, and a chip-plus-text instruction into one frozen-workflow job and returns a PNG concept preview with seed and prompt.
+
+The mapping is fixed: node 370 for the drawing, node 371 for style when present, node 377 for the assembled instruction, and node 368 for sampler values, with a three-megapixel Lanczos working canvas. A hosted or local GPU worker runs a pretrained Qwen Image Edit graph. The students did not train that graph.
+
+The literature already provides I2I, diffusion, latent generation, spatial control, and instruction editing. The gap addressed here is a systems and interaction gap: a designer-facing client that jointly consumes drawing, style, and instruction without exposing the node graph. Results are judged by whether the building remains recognizable, whether style and instruction appear, and whether the PNG is usable in an early design conversation. No FID, SSIM, LPIPS, or user-study percentages are claimed.
+
+6.2 FUTURE SCOPE
+
+- Curated architectural test set and measured SSIM (or edge SSIM) and LPIPS, plus a short expert rubric.
+- Stronger geometric constraints (for example optional edge conditioning) if structure drifts, without claiming a new ControlNet paper unless that work is actually done.
+- Few-step quality improvements that remain compatible with the frozen graph.
+- Batch comparison of scenarios from one drawing.
+- Clearer handling of missing style images and failed worker jobs in the status bar.
+- Optional local-only deployment documentation for labs that cannot use a hosted GPU.
+
+These items are future work. They are not results of the current implementation.
+
+================================================================================
+REFERENCES
+================================================================================
+
+[1] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” in Advances in Neural Information Processing Systems, vol. 33, 2020.
+
+[2] R. Rombach, A. Blattmann, D. Lorenz, P. Esser, and B. Ommer, “High-resolution image synthesis with latent diffusion models,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), 2022.
+
+[3] W. Peebles and S. Xie, “Scalable diffusion models with transformers,” in Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV), 2023.
+
+[4] L. Zhang, A. Rao, and M. Agrawala, “Adding conditional control to text-to-image diffusion models,” in Proc. IEEE/CVF Int. Conf. Comput. Vis. (ICCV), 2023.
+
+[5] C. Meng, Y. He, Y. Song, J. Song, J. Wu, J.-Y. Zhu, and S. Ermon, “SDEdit: Guided image synthesis and editing with stochastic differential equations,” in Proc. Int. Conf. Learn. Represent. (ICLR), 2022.
+
+[6] C. Saharia, W. Chan, H. Chang, C. A. Lee, J. Ho, T. Salimans, D. J. Fleet, and M. Norouzi, “Palette: Image-to-image diffusion models,” in Proc. ACM SIGGRAPH, 2022.
+
+[7] A. Hertz, R. Mokady, J. Tenenbaum, K. Aberman, Y. Pritch, and D. Cohen-Or, “Prompt-to-prompt image editing with cross-attention control,” 2022.
+
+[8] T. Brooks, A. Holynski, and A. A. Efros, “InstructPix2Pix: Learning to follow image editing instructions,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), 2023.
+
+[9] P. Isola, J.-Y. Zhu, T. Zhou, and A. A. Efros, “Image-to-image translation with conditional adversarial networks,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), 2017.
+
+[10] J.-Y. Zhu, T. Park, P. Isola, and A. A. Efros, “Unpaired image-to-image translation using cycle-consistent adversarial networks,” in Proc. IEEE Int. Conf. Comput. Vis. (ICCV), 2017.
+
+[11] C. Wu et al., “Qwen-Image technical report,” arXiv:2508.02324, 2025.
+
+[12] S. Bai et al., “Qwen2.5-VL technical report,” arXiv:2502.13923, 2025.
+
+[13] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen, “LoRA: Low-rank adaptation of large language models,” in Proc. Int. Conf. Learn. Represent. (ICLR), 2022.
+
+================================================================================
+HOW TO USE THIS FILE IN THE BLACKBOOK
+================================================================================
+1. Copy into the NMIMS Word / LaTeX template used for D008_D041_D045.
+2. Fill student names, roll numbers, SAP IDs, and guide name on the certificate and acknowledgement.
+3. Paste Fig. 1–7 from Reimagine_Render_Engine_IEEE_v2.docx (or live screenshots) into the figure list.
+4. Convert Table 1 into a proper Word table (landscape if needed).
+5. Do not add FID/SSIM numbers unless you measure them.
+6. Keep the non-claims: no new model, no BIM, no 8K pixel guarantee.

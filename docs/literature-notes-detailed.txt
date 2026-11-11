@@ -1,0 +1,363 @@
+DETAILED LITERATURE NOTES (PLAIN TEXT)
+Reimagine Render Engine capstone
+No figures. These notes paraphrase published work for study and citation. Quote only short phrases. Always cite the original paper in your report. ComfyUI, Electron, and hosted GPU platforms are tools, not papers.
+
+HOW TO USE THIS FILE
+Read in this order: (A) what the product does, (B) GAN image-to-image, (C) diffusion foundations, (D) editing and control, (E) adapters, (F) the Qwen stack you actually run, (G) architecture-specific surveys and evaluation metrics, (H) synthesis for your related-work chapter.
+
+WHAT THE PRODUCT IS (so every paper has a hook)
+The desktop app takes (1) a base architectural drawing or wireframe, (2) an optional style photograph, (3) a written instruction assembled from a texture prompt plus style, tag, and lighting chips, and (4) sampler settings. Those values fill a frozen ComfyUI graph: node 370 load base image, node 371 load style image, node 377 text-encode for Qwen image-edit, node 368 KSampler. The job is an instruction-and-reference-conditioned image-to-image (I2I) edit, not text-to-image from empty noise and not a newly trained network. Default sampler: 4 steps, CFG 1.0, Euler, optional Lightning LoRA. Evaluation, if you add it later, should ask: did the plan survive (structure), did the style photograph transfer (appearance), did the instruction apply (semantics), and was the result usable as a design preview (architect criteria, not FID alone).
+
+
+================================================================================
+PAPER 1
+Isola, P., Zhu, J.-Y., Zhou, T., and Efros, A. A. (2017). Image-to-image translation with conditional adversarial networks. IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR). arXiv:1611.07004. Common name: pix2pix.
+
+PROBLEM
+Many graphics and vision tasks are the same mathematical setting: map pixels of one representation of a scene to pixels of another. Examples include semantic labels to photo, edges to photo, grayscale to color, day to night. Before this paper, each task used a custom algorithm and a hand-designed loss. Convolutional networks could learn mappings, but L2 or L1 pixel losses average over plausible outputs and produce blur. The authors argue the community has stopped hand-engineering mapping functions; they want to stop hand-engineering losses as well.
+
+METHOD
+They train a conditional GAN (cGAN). The generator G maps an observed image x and noise z to an output y. The discriminator D sees either a real pair (x, y) or a fake pair (x, G(x,z)) and must tell them apart. The generator is trained to fool D. They mix the adversarial objective with an L1 reconstruction term so the output stays near the paired ground truth while remaining sharp. L1 is preferred to L2 because L2 encourages more blur. Noise z is not a useful extra input in their experiments (the net ignores it); they inject stochasticity via dropout at train and test time, and still observe only mild diversity. Architecture: U-Net generator with skip connections so low-level structure (edges, alignment) can skip the bottleneck; PatchGAN discriminator that classifies N by N patches as real or fake, capturing high-frequency texture without a full-image discriminator. Same architecture and loss are reused across datasets; only the data change.
+
+FINDINGS AND LIMITATIONS
+The same recipe works for labels-to-street-photos (Cityscapes), maps-to-aerial, edges-to-handbags/shoes, colorization, and related tasks. Human and FCN-score evaluations favor cGAN plus L1 over L1 alone. Patch size matters: 1x1 is a PixelGAN (color/stats), 70x70 PatchGAN is a good default, full-image GAN can be unstable. Limitations: needs paired data; outputs can still be artifacts; little diversity; 256-scale typical. Deterministic pix2pix later used as a baseline that "averages" appearance (see Paper 16).
+
+RELEVANCE TO REIMAGINE
+This paper defines the capstone problem as I2I: wireframe or drawing is one representation, photoreal render is another. You do not train pix2pix. You inherit the problem statement. Unlike pix2pix you also have an instruction and an optional second image. Pix2pix would require a large paired dataset of your drawings and target photos; you instead use a pretrained editor. If someone asks why not pix2pix: pairing cost, blur/averaging, and no natural-language control.
+
+
+================================================================================
+PAPER 2
+Zhu, J.-Y., Park, T., Isola, P., and Efros, A. A. (2017). Unpaired image-to-image translation using cycle-consistent adversarial networks. IEEE International Conference on Computer Vision (ICCV). arXiv:1703.10593. Common name: CycleGAN.
+
+PROBLEM
+Paired I2I (Paper 1) needs aligned examples (x, y) of the same scene in two domains. Many interesting translations lack pairs: horse and zebra photographs of different animals, paintings and photos of different scenes, summer and winter Yosemite from different years. The task is to learn G: X -> Y and F: Y -> X using unpaired collections.
+
+METHOD
+Two GANs plus cycle consistency. Adversarial losses push G(X) to look like domain Y and F(Y) to look like domain X. That is not enough: infinitely many G could match the marginal of Y while ignoring the particular x. Cycle loss requires F(G(x)) ~ x and G(F(y)) ~ y (L1 in pixel space). Optional identity loss: G(y) ~ y when y is already in Y, which helps color preservation (e.g. photo-to-painting). Generators are residual encoder-decoders; discriminators are PatchGANs. Training uses least-squares GAN variants in the published code lineage.
+
+FINDINGS AND LIMITATIONS
+Works for style transfer, object transfiguration (horse-zebra), season transfer, photo enhancement. Fails when domains require geometric change (dog-cat) because the cycle is largely appearance-based. Mode collapse and hidden pairing artifacts are known issues. Unpaired does not mean unsupervised in a strong causal sense; it means unpaired collections.
+
+RELEVANCE TO REIMAGINE
+You usually have a specific drawing and a specific style photo, which is closer to paired/conditioned editing than unpaired domain transfer. CycleGAN is the contrast case: "what if we only had a folder of photos and a folder of drawings with no correspondence?" Architects often lack aligned datasets, so CycleGAN-style unpaired methods appear in architectural GAN literature (Paper 15). Your product does not implement CycleGAN; it uses an editor that sees both images in one job. If the style image is missing, the prompt still describes photorealism rather than learning a whole unpaired domain.
+
+
+================================================================================
+PAPER 3
+Ho, J., Jain, A., and Abbeel, P. (2020). Denoising diffusion probabilistic models. Advances in Neural Information Processing Systems (NeurIPS). arXiv:2006.11239. Common name: DDPM.
+
+PROBLEM
+Likelihood-based generative models (VAEs, autoregressive, flows) have well-defined objectives but often lag GANs in sample quality. The authors connect nonequilibrium thermodynamics-style diffusion (Sohl-Dickstein et al.) to modern deep nets and show competitive image samples with a simple objective.
+
+METHOD
+Forward process: a Markov chain that adds Gaussian noise to data x0 over T steps (typically T = 1000) according to a variance schedule beta_t, producing xT that is nearly isotropic Gaussian. Reverse process: a neural net (U-Net with self-attention in their ImageNet/CIFAR setups) predicts the noise epsilon added at step t, equivalently parameterizing the mean of p_theta(x_{t-1}|x_t). Training minimizes a variational bound that simplifies, in the epsilon-prediction parameterization, to a weighted MSE between true noise and predicted noise. Sampling starts from Gaussian noise and iteratively denoises. They discuss simplifications of the ELBO weighting; predicting epsilon works better in practice than predicting x0 for their settings.
+
+FINDINGS AND LIMITATIONS
+FID competitive with then-strong GANs on CIFAR-10 and LSUN, with better mode coverage in some analyses. Sampling is slow (hundreds to thousands of network evaluations). Later work (DDIM, distillation, latent diffusion, consistency models) attacks this cost. The paper is unconditional or class-conditional generation, not I2I.
+
+RELEVANCE TO REIMAGINE
+Every modern "generate in ComfyUI" sampler (including Euler on a Qwen/MMDiT graph) is a cousin of this reverse process: start from noise (or a noisy encoding of an image) and denoise under conditions. Your default of 4 steps is not the original T=1000 DDPM; it is a heavily accelerated schedule enabled by distillation/LoRA (Paper 11) and a different backbone. When you explain "why a GPU worker," this paper is why iterative denoising is expensive.
+
+
+================================================================================
+PAPER 4
+Rombach, R., Blattmann, A., Lorenz, D., Esser, P., and Ommer, B. (2022). High-resolution image synthesis with latent diffusion models. CVPR. arXiv:2112.10752. Common name: Latent Diffusion / basis of Stable Diffusion.
+
+PROBLEM
+Pixel-space diffusion (Paper 3, also ADM, Imagen-style pyramids) at high resolution is computationally heavy because the U-Net runs on every pixel. The authors separate "perceptual compression" from "semantic generation."
+
+METHOD
+Stage 1: train an autoencoder (KL or VQ) so an image x is encoded to a lower-dimensional latent z = E(x) and decoded x_hat = D(z). The latent is still spatially structured (e.g. 8x spatial downsampling), unlike a tiny 1D code. Stage 2: run DDPM-like diffusion in z-space with a U-Net. Conditioning (text, class, layout) is injected by cross-attention: a domain-specific encoder tau(y) produces tokens that the U-Net attends to. This is the mechanism behind "prompt" control in Stable Diffusion. They show inpainting and other I2I-style tasks by concatenating masked images or spatial maps into the U-Net.
+
+FINDINGS AND LIMITATIONS
+High-resolution synthesis with far less compute than pixel diffusion. Convolutional sampling can produce megapixel images. Text-to-image via CLIP or language-model tokens. Limitations: autoencoder artifacts (text in images, fine structure), bias of training data (LAION-scale collections), still many denoising steps unless accelerated, weaker native layout control than later ControlNet.
+
+RELEVANCE TO REIMAGINE
+Your worker is not Stable Diffusion 1.5, but it still uses a VAE to compress images and a transformer/MMDiT to denoise latents under text and image conditions (Paper 14). The conceptual split "do not diffuse every pixel; diffuse a compressed map" is why a single GPU job is feasible. Node 377 is the analogue of "condition tokens from text plus images." Cross-attention / dual-stream attention is how instructions reach pixels.
+
+
+================================================================================
+PAPER 5
+Peebles, W., and Xie, S. (2023). Scalable diffusion models with transformers. ICCV. arXiv:2212.09748. Common name: DiT (Diffusion Transformer).
+
+PROBLEM
+Latent diffusion (Paper 4) used a convolutional U-Net backbone. Vision transformers succeeded in recognition; this paper asks whether transformers can be the diffusion backbone in latent space and how quality scales with compute.
+
+METHOD
+Patchify the latent from a pretrained SD-style VAE, add positional embeddings, process with a transformer. Conditioning (class labels in the paper) uses adaptive layer norm (adaLN-Zero): timestep and class embeddings modulate scale/shift of norms; residual scales are zero-initialized so the block starts as identity, which stabilizes training. They study Gflops vs FID on ImageNet latents and show smoother scaling than U-Nets in their plots. Classifier-free guidance still applies.
+
+FINDINGS AND LIMITATIONS
+DiT-XL/2 reaches strong ImageNet FID. Scaling: more Gflops, better FID, with architecture mattering less than compute once the design is right. The paper is class-conditional ImageNet, not text-and-image editing. Later MMDiT (used in SD3, Flux, Qwen-Image) extends the idea to separate or double streams for text and image tokens.
+
+RELEVANCE TO REIMAGINE
+Qwen-Image (Paper 14) uses a 20B-parameter MMDiT, not a U-Net. DiT is the architectural ancestor you should name when a supervisor asks "why transformer instead of U-Net?" Zero-init residual ideas also appear in ControlNet's zero convolutions (Paper 6).
+
+
+================================================================================
+PAPER 6
+Zhang, L., Rao, A., and Agrawala, M. (2023). Adding conditional control to text-to-image diffusion models. ICCV. arXiv:2302.05543. Common name: ControlNet.
+
+PROBLEM
+Text prompts poorly specify layout, pose, edges, and depth. Directly finetuning a large T2I model on small spatial datasets risks catastrophic forgetting of billions of images of pretraining. Users want Canny edges, HED scribbles, OpenPose, depth, normals, segmentation, etc., as extra images.
+
+METHOD
+Lock (freeze) the production T2I U-Net. Clone its encoder (and middle) into a trainable copy. Connect clone to original with 1x1 "zero convolution" layers (weights and bias start at zero). At step 0, ControlNet adds nothing, so the backbone behaves as pretrained. During training the zero convs grow and inject the condition. A small encoder maps the conditioning image (edge map, depth, ...) into the feature space. Supports one or several conditions; can run with empty prompt. Robust from under 50k to over 1M images. Training a depth ControlNet on one consumer GPU is reported as competitive with some industrial depth-to-image systems.
+
+FINDINGS AND LIMITATIONS
+Strong spatial following of edges and poses. User studies vs PITI, T2I-Adapter (concurrent), etc. Failure modes: conflicting prompt vs map; over-strict edges that fight photorealism; scribble vs clean Canny domain gap (see Paper 16). ControlNet is extra parameters beside a frozen SD, not a full new foundation model.
+
+RELEVANCE TO REIMAGINE
+Architects care that walls, openings, and masses of the wireframe survive. ControlNet is the standard citation for "structure image as spatial condition." Your graph is Qwen image-edit with a loaded base image and a prompt, which is related but not identical to a Canny-ControlNet on SD1.5. You should say: we pursue the same goal (preserve drawing geometry, change materials and light) using a foundation editor that already consumes images, rather than training a new ControlNet. If structure drifts, ControlNet-style edge conditioning is a known alternative in the literature (and in Comfy ecosystems). Paper 16 found ControlNet high structural diversity but weaker content-distance than MUNIT on their architect sketches.
+
+
+================================================================================
+PAPER 7
+Brooks, T., Holynski, A., and Efros, A. A. (2023). InstructPix2Pix: learning to follow image editing instructions. CVPR. arXiv:2211.09800.
+
+PROBLEM
+Most text-based editors want a caption of the input and a caption of the output, or a mask, or inversion plus finetuning. Users instead want to type an instruction: "make it golden hour," "change to concrete," "have her ride a dragon." Paired instruction-image-edit data do not exist at internet scale.
+
+METHOD
+Two-stage synthetic data, then a conditional latent diffusion model. (1) Fine-tune GPT-3 on about 700 human triplets (LAION caption, instruction, edited caption), then generate about 454k text triplets. (2) Turn before/after captions into image pairs with Stable Diffusion plus Prompt-to-Prompt (Paper 8) so the two images share layout. Filter bad pairs. Train a latent diffusion U-Net that concatenates the input image latents with the noisy latents (InstructPix2Pix conditioning) and uses the instruction as text. Classifier-free guidance on both image and text. Edit in one forward sampling pass; no per-image inversion.
+
+FINDINGS AND LIMITATIONS
+Zero-shot transfer to real photos and human instructions despite synthetic training. Seconds per edit. Fails on large geometric rearrangements, counting, tiny text, and instructions that need 3D understanding. Image guidance vs text guidance is a tradeoff: too much image CFG and the edit is weak; too little and identity is lost.
+
+RELEVANCE TO REIMAGINE
+This is the closest classic paper to your texture prompt. Node 377 plus the assembled prompt is the same user story: "tell the model what to do to image 1." You additionally allow image 2 as style. InstructPix2Pix did not focus on architectural drawings; generalization from synthetic LAION edits to sparse wireframes is an open risk (Paper 16). You did not train InstructPix2Pix; Qwen-Image-Edit is a later foundation editor with a VLM encoder (Papers 13-14).
+
+
+================================================================================
+PAPER 8
+Hertz, A., Mokady, R., Tenenbaum, J., Aberman, K., Pritch, Y., and Cohen-Or, D. (2023). Prompt-to-prompt image editing with cross-attention control. ICLR. arXiv:2208.01626.
+
+PROBLEM
+If you generate an image from prompt P and then generate from slightly edited prompt P*, a fresh diffusion run usually changes layout, identity, and unrelated objects. Editing needs a way to keep structure while changing the words.
+
+METHOD
+Cross-attention maps in T2I diffusion bind prompt tokens to spatial regions. Prompt-to-prompt injects (replaces or blends) attention maps from the original generation into the new generation for a number of steps, then lets the new prompt take over. Variants: word swap, adding a phrase, prompt refinement. For real images they discuss inversion so a photo can be treated like a generated one (with known limitations of inversion fidelity). No extra trained editor; it manipulates a frozen T2I model.
+
+FINDINGS AND LIMITATIONS
+Local edits when attention is localized; global style when maps are handled differently. Fails when inversion is inaccurate or when the edit needs new structure the original maps cannot express. Used as a data-generation tool in InstructPix2Pix (Paper 7).
+
+RELEVANCE TO REIMAGINE
+Use this paper to explain identity preservation versus full regeneration. Your pipeline regenerates through an edit model rather than swapping attention in a frozen SD. The scientific issue is the same: if the drawing's attention/structure is not respected, windows jump and masses change. Prompt-to-prompt is training-free but tied to a specific T2I run; your product is a reusable editor session with explicit image inputs.
+
+
+================================================================================
+PAPER 9
+Meng, C., He, Y., Song, Y., Song, J., Wu, J., Zhu, J.-Y., and Ermon, S. (2022). SDEdit: guided image synthesis and editing with stochastic differential equations. ICLR. arXiv:2108.01073.
+
+PROBLEM
+Need a unified, training-free (given a pretrained SDE/diffusion model) way to synthesize from stroke paintings or to edit a photo toward a new prompt/style without task-specific GAN training.
+
+METHOD
+Model the pretrained generator as an SDE. For editing: take a user image (or strokes), add noise up to timestep t0 (not all the way to pure noise), then run the reverse SDE/ODE with a target prompt or the model's prior. t0 is the main knob: small t0 keeps the input (weak edit, high fidelity); large t0 allows larger changes (low fidelity). They analyze the tradeoff with an SDEdit procedure on score-based models (NCSN++, DDPM). No paired I2I dataset for the editor itself.
+
+FINDINGS AND LIMITATIONS
+Stroke-to-image and realistic edits on faces and scenes. Compared later as a baseline to InstructPix2Pix: SDEdit uses a full target description and noising, not an instruction. Too much noise destroys structure; too little cannot change materials enough. Stochastic; results vary with seed.
+
+RELEVANCE TO REIMAGINE
+SDEdit is the "noise the drawing then denoise into a photo" baseline. Your KSampler with denoise 1.0 and an edit model is conceptually related but uses learned image conditioning (VAE path + VLM path in Paper 14) rather than only perturb-and-denoise. If a supervisor says "why not just img2img in Stable Diffusion," this is the paper, and Paper 7 explains why instructions plus paired training help.
+
+
+================================================================================
+PAPER 10
+Saharia, C., Chan, W., Chang, H., Lee, C. A., Ho, J., Salimans, T., Fleet, D. J., and Norouzi, M. (2022). Palette: image-to-image diffusion models. ACM SIGGRAPH / arXiv:2111.05826.
+
+PROBLEM
+Show that a single diffusion I2I architecture can replace many specialized networks for colorization, inpainting, uncropping, and JPEG restoration, with better sample quality and diversity than GAN I2I in their tests.
+
+METHOD
+Conditional diffusion: the U-Net sees concatenated source and noisy target (and optionally a mask for inpainting). Self-attention for global consistency (important for colorization of large regions). L2 noise-prediction loss. Compared against pix2pix, Pix2PixHD, DeepFill, etc. They emphasize diversity of samples vs GAN collapse, and FID/IS plus task metrics.
+
+FINDINGS AND LIMITATIONS
+Strong inpainting and colorization. Uncropping is a hard outpainting-like task. Not focused on free-form language instructions; conditions are images/masks. Pixel or large-spatial diffusion is expensive. Palette is task-trained, not a single foundation edit model.
+
+RELEVANCE TO REIMAGINE
+Cite Palette to say diffusion I2I is not only T2I with a prompt. Your job is I2I with extra text. Palette's concatenation of source image into the denoiser is analogous to "image 1 must stay in the network," which Qwen does via VAE reconstructive features rather than a U-Net concat (Paper 14).
+
+
+================================================================================
+PAPER 11
+Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., and Chen, W. (2022). LoRA: low-rank adaptation of large language models. ICLR. arXiv:2106.09685.
+
+PROBLEM
+Full finetuning of large models (they study Transformers/LLMs, including GPT-2/3-scale) stores a new copy of all weights per task, which is costly. Adapters add layers and latency. The hypothesis: weight updates during adaptation have low intrinsic rank.
+
+METHOD
+Freeze pretrained weight W. For selected matrices (typically attention q/v), learn two thin matrices B and A so Delta W = B A, with rank r much smaller than d. Output is Wx + BAx. A is Gaussian init, B zero init so adaptation starts at the pretrained model (same spirit as zero convs / adaLN-Zero). Merge BA into W at deployment for zero extra latency. Train with standard task losses.
+
+FINDINGS AND LIMITATIONS
+On GPT-2/3, RoBERTa, DeBERTa, and later hugely adopted in diffusion (community LoRAs, including "Lightning" step-distillation LoRAs), quality approaches full finetune with few trainable parameters. Rank r is a hyperparameter; too small underfits. Originally NLP; diffusion LoRAs are an empirical transfer of the same math.
+
+RELEVANCE TO REIMAGINE
+Your Lightning LoRA is why 4 Euler steps can still look acceptable: someone distilled or adapted the slow foundation sampler into a low-rank patch. You did not train LoRA. You should cite this paper as the parameter-efficient adaptation method, then clearly say the Lightning weights are an ecosystem artifact on top of Qwen-Image-Edit. Tradeoff: fewer steps, possible quality/structure loss versus 20-40 step sampling (as even the Comfy node notes in your workflow comments).
+
+
+================================================================================
+PAPER 12
+Podell, D., English, Z., Lacey, K., Blattmann, A., Dockhorn, T., Muller, J., Penna, J., and Rombach, R. (2023). SDXL: improving latent diffusion models for high-resolution image synthesis. arXiv:2307.01952.
+
+PROBLEM
+SD 1.4/1.5 (Paper 4 lineage) is limited in composition, text rendering, and native 1024-scale quality. Need a bigger, better-conditioned latent diffusion model that still fits consumer-to-prosumer GPUs in a two-stage pipeline.
+
+METHOD
+Larger U-Net (about 2.6B vs ~0.9B), more attention at higher resolutions, two text encoders (CLIP ViT-L and OpenCLIP ViT-bigG) concatenated. Conditioning on image size and crop parameters so the model knows canvas size and can avoid random crops as a latent "unknown." Trained toward 1024x1024. Optional refinement network: a separate SDXL-initialized model specialized in high-noise or a last few steps of denoising (the paper discusses base + refiner). Offset-noise and other training tricks appear in the SDXL ecosystem.
+
+FINDINGS AND LIMITATIONS
+Human preference and improved prompt following vs SD1.5. Still weak at long text, counting, true layout control without extras. U-Net, not MMDiT. Closed training data details. Commercial and community checkpoints proliferated.
+
+RELEVANCE TO REIMAGINE
+SDXL is the comparison "previous generation foundation T2I" versus Qwen-Image (Paper 14). You do not run SDXL. If asked why Qwen: stronger native editing and VLM conditioning, better text rendering claims, MMDiT scaling. If asked why not SDXL+ControlNet: that is a valid alternative architecture (Papers 6+12) widely used in architectural visualization practice (Paper 15); your choice is a different foundation editor already wired in Comfy.
+
+
+================================================================================
+PAPER 13
+Bai, S., et al. / Qwen Team (2025). Qwen2.5-VL technical report. arXiv:2502.13923.
+
+PROBLEM
+Vision-language models must handle native-resolution images, long video, documents, grounding (boxes and points), and agent-style UI understanding, not only short captions.
+
+METHOD
+Three parts: Qwen2.5 LLM decoder; a ViT vision encoder with window attention, 2D-RoPE, patches stride 14, image sides rounded to multiples of 28; MLP merger into LLM tokens. Dynamic resolution: token count scales with image size; bounding boxes use absolute pixel coordinates, not normalized 0-1, so scale is learnable. Video: dynamic FPS and MRoPE aligned to absolute time so the model learns duration, not just frame index. Pretraining corpus scaled (report: on the order of 4.1T tokens vs 1.2T in a prior generation). Post-training: SFT then DPO, ViT often frozen in post-train. Sizes 3B / 7B / 72B with documented layer/head configs. Strong OCR, document HTML-style parsing, screenshot agents.
+
+FINDINGS AND LIMITATIONS
+Competitive or better than contemporaneous open VLMs on MMMU, MathVista, OCR, grounding, video. Still a generalist: not an image generator by itself. Hallucination and bias remain. Closed portions of data.
+
+RELEVANCE TO REIMAGINE
+Paper 14 freezes or uses Qwen2.5-VL as the semantic encoder for prompts and for the input image(s). That is why a long texture prompt plus "style in image 2" can be interpreted with visual context, unlike CLIP-only SD1.5. Node 377 in your graph is a Qwen image-edit text encoder in Comfy terms; scientifically it sits on this VLM. You do not fine-tune Qwen2.5-VL.
+
+
+================================================================================
+PAPER 14
+Qwen Team (2025). Qwen-Image technical report. arXiv:2508.02324. Closest paper to qwen_image_edit_2511.
+
+PROBLEM
+Two gaps in foundation image models: (1) complex text rendering, especially Chinese and multi-line layouts; (2) edits that keep identity and pixels that should not change, while following instructions.
+
+METHOD
+Three modules: frozen Qwen2.5-VL for condition features (last hidden states; different system prompts for T2I vs image+text); VAE with shared encoder and an image decoder finetuned for small text (reconstruction + perceptual losses; they found adversarial loss unhelpful once recon is strong); MMDiT ~20B with 60 layers, 24 heads, MSRoPE so text is treated as 2D tokens along the diagonal of the image grid (avoids isomorphic rows of Scaling-RoPE). Multi-task training: T2I, TI2I editing, and I2I reconstruction to align VLM latents with MMDiT. Dual encoding of the user image: VLM semantic path + VAE appearance path. Curriculum on text rendering from no-text to paragraph. Data: Nature ~55%, Design ~27% (posters, UI, slides, art), People ~13%, conservative synthetic text rendering ~5%; multi-stage filters S1-S7. Producer-consumer training infrastructure.
+
+Reported architecture table (from the report): VLM 7B-class vision+LLM used as encoder; VAE tens of millions of parameters; MMDiT 20B. Benchmarks: GenEval, DPG, OneIG-Bench for generation; GEdit, ImgEdit, GSO for editing; LongText-Bench, ChineseWord, CVTG-2K for text.
+
+FINDINGS AND LIMITATIONS
+Strong editing (style transfer, add/remove, pose, background) and unusually strong glyph rendering. Editing still imperfect on hard geometry and on out-of-domain sparse line drawings (not the paper's main test). 20B MMDiT implies serious VRAM; hence a remote worker. Later monthly edit drops (e.g. 2509 in ecosystem notes) add multi-image and native control-like conditions; your filename 2511 is that family, not the August report's exact checkpoint. Always say "family of Qwen-Image-Edit" unless you cite a 2511 paper (there may not be a separate academic paper).
+
+RELEVANCE TO REIMAGINE
+This is the model family inside the Comfy graph. Dual encoding explains why you send both images and a prompt: semantics from the VLM, pixels from the VAE. I2I reconstruction training is why the editor can keep the building while changing materials. Lightning LoRA (Paper 11) is extra. You did not retrain Qwen-Image. Your contribution is packaging this stack in a desktop I2I job with frozen node IDs.
+
+
+================================================================================
+PAPER 15
+Li, C., Zhang, T., Du, X., Zhang, Y., and Xie, H. (2024). Generative AI models for different steps in architectural design: a literature review. arXiv:2404.01335.
+
+PROBLEM
+Architects lag CS in adopting DDPM/LDM/foundation models versus older GANs/VAEs, often because of skill barriers. Need a map from model types to design steps.
+
+METHOD
+Review (not a new model). Explains GANs, cGANs, pix2pix, StyleGAN, DDPM, LDM/LCM, foundation LLMs/VLMs/CLIP/SAM, T2I (StackGAN, GLIDE, SD, DALLE), I2I and sketch-to-image including SketchyGAN and ControlNet, layout-to-image, video DMs, 3D (voxels, point clouds, meshes, NeRF/implicit). Then six architectural steps distilled from professional practice: concept images, 3D form, floor plans, structure, facades, sections. Surveys 2020-onward projects per step. Notes RIBA survey: 41% of UK architects had used AI at least occasionally; 43% thought it helped efficiency. MVRDV and Zaha Hadid practices mentioned as using gen AI for concept images.
+
+FINDINGS AND LIMITATIONS
+Most architectural genAI papers still GAN-heavy while CS moved to diffusion. Sketch-to-image and facade generation are the closest to your app. 3D generation is a different track (you do not output BIM or meshes). The six-step split is a pedagogical device, not a universal office workflow.
+
+RELEVANCE TO REIMAGINE
+Place the product in "concept image / visualization from drawings," not structural calculation or code-compliant plans. Cite this review to show you know the design-process literature, not only CVPR. Honest limit: photoreal preview is one step; it does not replace sections, structure, or professional drawings.
+
+
+================================================================================
+PAPER 16
+Yeh, E., Hitaj, B., Sadhu, V., Roy, A., Nakabayashi, T., and Tsuji, Y. (2023). Automatic measures for evaluating generative design methods for architects. arXiv:2303.11483.
+(Your starter list said Pizarro et al.; the arXiv:2303.11483 author list is Yeh, Hitaj, Sadhu, Roy, Nakabayashi, Tsuji, with Obayashi Corporation collaboration. Cite the PDF on arXiv, not a guessed first author.)
+
+PROBLEM
+CV papers optimize realism (FID). Architects generating options from conceptual sketches also need overall intent (massing and program cues in a sparse sketch) and structural variety (different materials/details, not one average render). Hand sketches are not Canny edges.
+
+METHOD
+Interviews with Obayashi architects: three criteria (intent, realism, variety). Proxies: content distance using a MUNIT content encoder (L1 between sketch and render content codes); FID vs real building photos for realism; structural diversity as inverse mean pairwise SSIM among 10 samples from one sketch. Methods compared: MUNIT, pix2pix, ControlNet (scribble, prompt "a photograph of a building"). Training images ~80k Flickr/Unsplash architecture photos; "sketches" for training from DexiNed edges because real conceptual sketches are scarce. Evaluation on 24 real architect sketches, 10 samples each.
+
+NUMBERS (from their Table 1; copy carefully if you use them)
+MUNIT: content 0.43 plus/minus 0.15, FID 188.05, diversity 0.37 plus/minus 0.22
+Pix2pix: content 0.54 plus/minus 0.08, FID 294.23, diversity 0.0 (deterministic)
+ControlNet: content 0.54 plus/minus 0.12, FID 190.48, diversity 0.80 plus/minus 0.36
+Raw sketches as "renders": content 0.07, FID 357.58, diversity 0.0
+MUNIT best content distance; ControlNet most diverse; pix2pix poorest realism and zero diversity (averaging palettes).
+
+FINDINGS AND LIMITATIONS
+Sparse sketches starve I2I models. DexiNed pseudo-sketches do not match hand drawings (domain gap). FID-only papers overclaim usefulness. Future: more real sketches, domain adaptation, human studies correlating metrics with architects' judgments. Small sketch test set (24).
+
+RELEVANCE TO REIMAGINE
+This is your limitations and evaluation chapter. Photoreal output can still fail intent. Wireframes may be denser than cocktail-napkin sketches, but the domain-gap warning still applies. For metrics: do not report only "it looks real." Use structure (SSIM Paper 17 or edge consistency), style (LPIPS Paper 18 vs reference photo), and a small expert rubric (intent, variety). ControlNet's high diversity vs weaker content match is a warning if you add ControlNet later: more variety can mean less obedience to the drawing.
+
+
+================================================================================
+PAPER 17
+Wang, Z., Bovik, A. C., Sheikh, H. R., and Simoncelli, E. P. (2004). Image quality assessment: from error visibility to structural similarity. IEEE Transactions on Image Processing, 13(4), 600-612.
+
+PROBLEM
+MSE and PSNR treat every pixel error equally and do not match human judgments. They ignore that HVS is adapted to structural information (correlated nearby pixels).
+
+METHOD
+SSIM compares two image patches via luminance (means), contrast (variances), and structure (normalized covariance / correlation). Combine into a single index, usually averaged over windows (MSSIM). Range typically toward 1 for identical structure. They argue quality assessment should be structural, not error-visibility alone.
+
+FINDINGS AND LIMITATIONS
+Better correlation with human ratings than MSE on many distortion types. Still a low-level metric: two different buildings with similar edge statistics can score well; a correct building with a big material change may score worse even if architects like it. Not a semantic metric. Sensitive to alignment: if the render shifts by a few pixels, SSIM drops.
+
+RELEVANCE TO REIMAGINE
+Use SSIM (or SSIM on Canny/HED of wireframe vs render) as a proxy that "openings and masses survived," never as the only score. Paper 16 used pairwise SSIM among samples as diversity (high SSIM = similar = low diversity). If you compare wireframe to render, expect modest SSIM because photoreal textures differ even when layout is right; consider SSIM on edge maps.
+
+
+================================================================================
+PAPER 18
+Zhang, R., Isola, P., Efros, A. A., Shechtman, E., and Wang, O. (2018). The unreasonable effectiveness of deep features as a perceptual metric. CVPR. arXiv:1801.03924. Common name: LPIPS.
+
+PROBLEM
+Traditional metrics (L2, SSIM, FSIM) disagree with humans on "which patch is closer." Maybe deep classification features already encode perceptual similarity.
+
+METHOD
+Compute features from a network (AlexNet, VGG, SqueezeNet, or a small trained net) at several layers, normalize, scale channels with learned weights, take L2 distances, average. Train the channel weights (and optionally the net) on two-alternative forced choice from the Berkeley-Adobe Perceptual Patch Similarity (BAPPS) dataset: humans pick which distorted patch is closer to a reference. Also traditional and CNN-based distortions.
+
+FINDINGS AND LIMITATIONS
+LPIPS correlates better with humans than SSIM/L2 on their tests. "Unreasonable effectiveness": even features from unsupervised or random nets help, but calibrated deep features work best. Limitations: depends on the backbone and training; can be fooled; not specifically architectural; expensive compared to SSIM; still not a guarantee of "same building."
+
+RELEVANCE TO REIMAGINE
+LPIPS(render, style_reference) as perceptual closeness of appearance; LPIPS(render, other_render) for diversity. Pair with SSIM/edges for structure so you do not reward a pretty image that ignored the plan. Do not claim LPIPS equals architectural quality (Paper 16).
+
+
+================================================================================
+SYNTHESIS FOR THE RELATED-WORK CHAPTER (WRITE FROM THIS)
+
+Paragraph 1 - Problem.
+Architectural visualization from early drawings is slow if it requires full 3D and physically based rendering. The computational problem is image-to-image translation (Paper 1): one representation of a building (line drawing) to another (photoreal image), optionally with a second image as appearance reference and a natural-language instruction.
+
+Paragraph 2 - GAN era.
+Conditional GANs (Paper 1) learned paired mappings with U-Net plus PatchGAN but needed aligned datasets and often averaged appearance. Unpaired CycleGAN (Paper 2) relaxed pairing but struggled with geometry. Architectural practice used these tools for facades and concepts (Paper 15) while CS moved on.
+
+Paragraph 3 - Diffusion era.
+DDPMs (Paper 3) made high-quality generative modeling a denoising process. Latent diffusion (Paper 4) made it affordable. Transformers as denoisers (Paper 5) led to MMDiT foundation models. Palette (Paper 10) showed diffusion is a general I2I tool, not only T2I.
+
+Paragraph 4 - Control and editing.
+Spatial maps: ControlNet (Paper 6). Training-free perturb-and-denoise: SDEdit (Paper 9). Training-free attention reuse: Prompt-to-Prompt (Paper 8). Instruction following with synthetic data: InstructPix2Pix (Paper 7). Parameter-efficient speed/quality patches: LoRA (Paper 11). SDXL (Paper 12) is a strong U-Net T2I baseline, not an instruction editor.
+
+Paragraph 5 - What you deploy.
+Qwen2.5-VL (Paper 13) understands images and long instructions. Qwen-Image (Paper 14) generates and edits with dual semantic/VAE paths and multi-task I2I. Your nodes 370/371/377/368 instantiate that editor. Lightning LoRA (Paper 11) reduces steps.
+
+Paragraph 6 - Architecture and evaluation.
+Paper 15 locates you in concept visualization, not BIM. Paper 16 says realism is not enough; intent and variety matter; hand drawings are out of distribution for edge-trained models. Measure structure with SSIM/edges (Paper 17) and appearance with LPIPS (Paper 18), plus expert review.
+
+Paragraph 7 - Your contribution (honest).
+You do not claim a new generator. You claim a desktop system that assembles a documented I2I job and (in the full product) runs it on a GPU worker. Tools (ComfyUI, Electron, hosted GPUs) are implementation. Novelty for the degree is integration, UX, frozen graph mapping, and this literature framing.
+
+
+GLOSSARY (SHORT)
+I2I: image-to-image. T2I: text-to-image. TI2I: text+image to image (editing). cGAN: conditional GAN. FID: Frechet Inception Distance (distributional realism; easy to misuse for architecture). CFG: classifier-free guidance scale (your default 1.0 is low, typical of Lightning/edit setups). VAE: variational autoencoder compressor. MMDiT: multimodal diffusion transformer. LoRA: low-rank adapter. PatchGAN: discriminator on local patches. Zero convolution: 1x1 conv starting at zero so a locked backbone is undisturbed at step 0.
+
+
+CITATION HYGIENE
+- Use the real author list for 2303.11483 (Yeh et al., not Pizarro).
+- Qwen-Image-Edit-2511 may not have its own paper; cite 2508.02324 as the family and name the checkpoint as software.
+- Do not cite RunPod or Electron as research.
+- Prefer the camera-ready venue (CVPR, ICCV, ICLR, NeurIPS, TIP, SIGGRAPH) plus arXiv id.
+
+END OF NOTES

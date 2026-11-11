@@ -1,0 +1,260 @@
+{
+  "355": {
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIPLoader"
+    }
+  },
+  "356": {
+    "inputs": {
+      "model": [
+        "367",
+        0
+      ],
+      "shift": 3.1
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "359": {
+    "inputs": {
+      "model": [
+        "356",
+        0
+      ],
+      "strength": 1
+    },
+    "class_type": "CFGNorm",
+    "_meta": {
+      "title": "CFGNorm"
+    }
+  },
+  "362": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAELoader"
+    }
+  },
+  "363": {
+    "inputs": {
+      "samples": [
+        "368",
+        0
+      ],
+      "vae": [
+        "362",
+        0
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
+    },
+    "class_type": "VAEDecodeTiled",
+    "_meta": {
+      "title": "VAEDecodeTiled"
+    }
+  },
+  "367": {
+    "inputs": {
+      "model": [
+        "376",
+        0
+      ],
+      "lora_name": "Qwen-Image-Edit-2511-Lightning-8steps-V1.0-fp32.safetensors",
+      "strength_model": 1
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly"
+    }
+  },
+  "368": {
+    "inputs": {
+      "model": [
+        "359",
+        0
+      ],
+      "positive": [
+        "379",
+        0
+      ],
+      "negative": [
+        "381",
+        0
+      ],
+      "latent_image": [
+        "380",
+        0
+      ],
+      "seed": 269346458435248,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "370": {
+    "inputs": {
+      "image": "6b1796d8-3cac-43d3-a670-da9cee4b17d4.jpg",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "LoadImage"
+    }
+  },
+  "371": {
+    "inputs": {
+      "image": "download (3).jpg",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "LoadImage"
+    }
+  },
+  "373": {
+    "inputs": {
+      "image": [
+        "370",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "megapixels": 3,
+      "resolution_steps": 1
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "ImageScaleToTotalPixels"
+    }
+  },
+  "376": {
+    "inputs": {
+      "unet_name": "qwen_image_edit_2511_fp8mixed.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNETLoader"
+    }
+  },
+  "377": {
+    "inputs": {
+      "clip": [
+        "355",
+        0
+      ],
+      "image1": [
+        "373",
+        0
+      ],
+      "image2": [
+        "371",
+        0
+      ],
+      "prompt": "replace the rendering in image 1 to the style in image 2.\n\nphotorealistic Corona Renderer, physically accurate global illumination, dense volumetric scattering with visible light shafts, atmospheric haze, Corona sun and Sky system, soft ray-traced shadows with natural falloff, ultra-detailed PBR materials, micro-surface displacement, cinematic depth of field, subtle chromatic aberration, 8k resolution, Interactive LightMix aesthetic, clean highlights, high dynamic range."
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus (Positive)"
+    }
+  },
+  "378": {
+    "inputs": {
+      "clip": [
+        "355",
+        0
+      ],
+      "image1": [
+        "373",
+        0
+      ],
+      "image2": [
+        "371",
+        0
+      ],
+      "prompt": ""
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus"
+    }
+  },
+  "379": {
+    "inputs": {
+      "conditioning": [
+        "377",
+        0
+      ],
+      "latent": [
+        "380",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "380": {
+    "inputs": {
+      "pixels": [
+        "373",
+        0
+      ],
+      "vae": [
+        "362",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAEEncode"
+    }
+  },
+  "381": {
+    "inputs": {
+      "conditioning": [
+        "378",
+        0
+      ],
+      "latent": [
+        "380",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "382": {
+    "inputs": {
+      "images": [
+        "363",
+        0
+      ],
+      "filename_prefix": "ComfyUI"
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "SaveImage"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "reimagine-progress-50-workflow-mapping",
+  "version": "0.1.0",
+  "description": "Capstone 50% — UI values injected into ComfyUI API nodes (no GPU job)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "convert-workflow": "node scripts/convert-workflow.js"
+  },
+  "author": "Capstone project",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

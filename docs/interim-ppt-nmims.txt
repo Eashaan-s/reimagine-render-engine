@@ -1,0 +1,291 @@
+NMIMS INTERIM PPT — DROP-IN CONTENT
+Project: Reimagine Render Engine
+Template followed: CapstoneProject_InterimPresentation.pdf (same sections, EXTC Phase-I format)
+Do not put RunPod, API keys, or endpoint IDs on any slide. Say “Inference worker.”
+Replace NAME / ROLL / GUIDES before you present.
+
+================================================================================
+SLIDE 1 — INSTITUTE OPENER (keep their layout)
+================================================================================
+BTech-Electronics and Telecommunications
+Project Phase- I, Interim Review Presentation
+Academic Year 2026-27
+Semester VII
+Department of Electronics and Telecommunication Engineering, Mukesh Patel School of Technology
+Management & Engineering, SVKM's Narsee Monjee Institute of Management Studies (NMIMS)
+Deemed-to-University, Mumbai-400056, India.
+
+================================================================================
+SLIDE 2 — TITLE
+================================================================================
+A Presentation On:
+Reimagine Render Engine
+Desktop Image-to-Image Preview of Architectural Drawings as Photorealistic Renders
+
+[Your Name] — [Roll No.]
+[Teammates if any]
+
+Department of Electronics and Telecommunication Engineering, Mukesh Patel
+School of Technology Management & Engineering, SVKM’s Narsee Monjee
+Institute of Management Studies (NMIMS) Deemed-to-University, Mumbai-400056, India.
+
+Under the Guidance Of:
+[Guide name]
+[Co-guide name if any]
+
+================================================================================
+SLIDE 3 — TABLE OF CONTENTS (same order as the sample)
+================================================================================
+Sr.No. | Section
+1 | Project Overview & Recap
+2 | Literature Survey
+3 | System Components
+4 | Methodology
+5 | Methodology Framework
+6 | Implementation Roadmap
+7 | Current Progress
+8 | Conclusion
+
+================================================================================
+SLIDE 4 — PROJECT OVERVIEW AND RECAP
+================================================================================
+Title: Project Overview and Recap
+
+• Problem: Photoreal architectural visualization normally needs 3D modelling, materials, lighting, and long render times, while early design still lives in 2D wireframes and drawings.
+
+• Proposed Solution: A Windows desktop application that takes a drawing, an optional style photograph, and a short instruction, then builds a standard image-to-image (I2I) edit job in one window — without a node editor and without training a new neural network.
+
+• Expected System Outcome: A photorealistic preview appears in the Output panel; the user can export a PNG. Geometry of the drawing should be preserved while materials and lighting follow the prompt and style image.
+
+Core Idea:
+“Reconnaissance of the design from a drawing — photoreal preview from the same 2D sheet, in a single desktop client.”
+
+(Shorter spoken line: Wireframe in, photoreal out, instruction in the middle.)
+
+================================================================================
+SLIDE 5 — LITERATURE SURVEY SUMMARY (table like the sample)
+================================================================================
+Title: Literature Survey Summary
+
+Research Area | Key Focus / Findings | Identified Gap / Relevance
+
+Image-to-image translation (GANs) [1–2]
+pix2pix learns paired pixel-to-pixel maps (edges/labels → photo) with a cGAN; CycleGAN relaxes pairing via cycle consistency.
+Defines the problem as I2I, not blank-canvas T2I. Pairing cost and blur/averaging limit a from-scratch GAN for this capstone.
+
+Diffusion foundations [3–5]
+DDPM: iterative denoising. Latent diffusion: denoise in a VAE latent. DiT/MMDiT: transformer denoisers at scale.
+Explains GPU cost and modern backbones. These papers generate/edit images; they are not a designer-facing desktop workflow.
+
+Spatial control and instruction editing [6–10]
+ControlNet: edge/depth/pose on a frozen T2I model. InstructPix2Pix: edits from a written instruction. SDEdit / Prompt-to-Prompt: training-free or attention-based edits. Palette: diffusion I2I.
+Same goals (keep structure, follow instructions). Gap: no simple drawing + style + prompt desktop job for architecture students.
+
+Foundation models and PEFT [11–14]
+LoRA: low-rank adapters (few-step “Lightning” sampling). SDXL: strong U-Net T2I baseline. Qwen2.5-VL + Qwen-Image: VLM semantics + VAE appearance + MMDiT editing.
+Closest stack to the frozen graph we map. We cite and integrate; we do not train these models.
+
+Architectural genAI and evaluation [15–18]
+Reviews place genAI in concept images vs plans/BIM. Yeh et al.: architects need intent, realism, and variety — not FID alone. SSIM / LPIPS: structure vs perceptual appearance.
+Gap we address: a usable client that packages I2I for concept preview, with honest evaluation later.
+
+================================================================================
+SLIDE 6 — SYSTEM COMPONENTS (1/2)
+================================================================================
+Title: System Components
+
+Component | Purpose
+Electron Renderer (HTML/CSS/JS) | Three-column UI: prompt, input drawing, output
+Title bar | Product name; minimize / maximize / close
+Style & Prompt panel | Texture prompt, style image, presets, tags, lighting, Generate
+Input panel | Wireframe dropzone, resolution, Import, Simple / Advanced
+Output panel | Result image, Export, history strip
+Status bar | Idle / mapping / error messages
+
+================================================================================
+SLIDE 7 — SYSTEM COMPONENTS (2/2)
+================================================================================
+Title: System Components
+
+Component | Purpose
+preload.js (window.reimagine) | Secure IPC only; page has no Node.js
+main.js | Window creation, Generate handler, PNG save dialog
+workflowBuilder.js | Writes UI values into frozen graph nodes
+workflows/workflow-api.json | Prepared ComfyUI API prompt
+convert-workflow.js | UI-export → API JSON when the graph file changes
+Inference worker (GPU) | Runs the image-edit job; returns PNG (next stage for this review)
+
+================================================================================
+SLIDE 8 — METHODOLOGY
+================================================================================
+Title: Methodology
+
+• Desktop client: Electron hosts the renderer; preload exposes generateRender, exportImage, getConfig, windowControl.
+
+• Capture: User imports a drawing (required) and optional style photo; chips and textarea form one instruction (assemblePrompt).
+
+• Mapping: buildWorkflowPayload fills node 370 (base), 371 (style), 377 (prompt), 368 (sampler: steps, CFG, name, seed). Defaults: 4 steps, CFG 1.0, Euler, random seed.
+
+• Job package: JSON with workflow + images named reimagine_base.png / reimagine_style.png (base64).
+
+• Inference (remaining): GPU worker executes the edit model (Qwen image-edit family) and returns a PNG.
+
+• Visualization: Output panel, Export to Pictures / Reimagine Renders, history strip.
+
+================================================================================
+SLIDE 9 — METHODOLOGY FRAMEWORK
+================================================================================
+Title: Methodology Framework
+
+Draw this left-to-right (boxes + arrows). Use a dashed arrow into the worker.
+
+User
+  → Desktop UI (three columns)
+  → Preload bridge (window.reimagine)
+  → Electron main (trigger-generation)
+  → workflowBuilder (nodes 370 / 371 / 377 / 368)
+  → Job package (workflow + images)
+  ⋯ dashed → Inference worker (GPU image-edit)
+  ⋯ dashed → Output PNG → Export / History
+
+Caption: Solid path = implemented for this review. Dashed = worker not demonstrated with vendor configuration.
+
+================================================================================
+SLIDE 10 — ROADMAP FOR IMPLEMENTATION
+================================================================================
+Title: Roadmap for Implementation
+
+Use two colours like the sample: Completed | Under progress
+
+Completed
+• Product identity (title bar: Reimagine Render Engine only)
+• 30% UI shell: window, import, preview
+• Interaction: dropzones, presets, Simple/Advanced, status bar
+• 50% workflow mapping: frozen nodes, assemblePrompt, mapped JSON
+• Client wiring: IPC, Export, history, renders folder
+• Documentation: architecture, logbook, literature notes
+
+Under progress
+• Attach Inference worker for live photoreal Output (no vendor details on this slide)
+• End-to-end demo with drawing → PNG in the same window
+• Optional structure/style checks (SSIM / LPIPS) after live results exist
+
+================================================================================
+SLIDE 11 — CURRENT PROGRESS (UI)
+================================================================================
+Title: Current Progress
+Fig. Three-column desktop client (Style & Prompt | Input | Output)
+
+Caption: Screenshot of npm start on progress/30-ui-shell or the same UI in later snapshots. Title bar shows Reimagine Render Engine only.
+
+Talking points: Layout is frozen from 30% onward. Import a PNG and show resolution.
+
+================================================================================
+SLIDE 12 — CURRENT PROGRESS (30%)
+================================================================================
+Title: Current Progress
+Fig. 30% UI shell — Generate not connected
+
+Caption: Screenshot of status: “30% — UI shell only” or the blocked Generate message.
+
+Talking points: Milestone is interaction, not GPU.
+
+================================================================================
+SLIDE 13 — CURRENT PROGRESS (50%)
+================================================================================
+Title: Current Progress
+Fig. 50% workflow mapping — job JSON without GPU
+
+Caption: Screenshot of status after Generate: nodes 370/371/377/368, seed, saved path; or a snippet of mapped JSON (no secrets).
+
+Talking points: This is the scientific heart: UI values land on the same graph the worker will run.
+
+================================================================================
+SLIDE 14 — CURRENT PROGRESS (ARCHITECTURE)
+================================================================================
+Title: Current Progress
+Fig. 70% system architecture (inference worker as black box)
+
+Caption: Diagram from Slide 9. Do not show .env, keys, or a cloud brand.
+
+Talking points: 70% = complete client-side job. Remaining 30% = plug in the worker.
+
+================================================================================
+SLIDE 15 — CURRENT PROGRESS (EXPORT / HISTORY)
+================================================================================
+Title: Current Progress
+Fig. Export and history strip
+
+Caption: Output panel controls (even if the image is still a placeholder at 50%).
+
+Talking points: Week-6 implementation: save PNG, history, window chrome, status overlay.
+
+================================================================================
+SLIDE 16 — CURRENT PROGRESS (DOCS)
+================================================================================
+Title: Current Progress
+Supporting write-ups (repo docs/)
+• Logbook: 8 weekly entries
+• Literature survey list + detailed notes
+• System architecture (review copy without vendor config)
+
+Optional: QR or path only, no unpublished secrets.
+
+================================================================================
+SLIDE 17 — CONCLUSION
+================================================================================
+Title: Conclusion
+
+• Literature treats drawing-to-photo as I2I (GANs then diffusion), with ControlNet / instruction editors as control mechanisms, and Qwen-Image as a current edit foundation.
+
+• Existing tools are node graphs or research code, not a three-column designer client.
+
+• This project maps a desktop UI onto a frozen graph (370 / 371 / 377 / 368) and assembles a complete job package.
+
+• Interim progress: 30% shell, 50% mapping, 70% client path; Inference worker is the next implementation stage.
+
+• Scope remains concept visualization, not BIM or construction drawings. Models are cited, not retrained.
+
+================================================================================
+SLIDE 18 — REFERENCES (1/2)
+================================================================================
+Title: References
+
+[1] Isola et al., Image-to-Image Translation with Conditional Adversarial Networks, CVPR, 2017.
+[2] Zhu et al., Unpaired I2I using Cycle-Consistent Adversarial Networks, ICCV, 2017.
+[3] Ho, Jain, Abbeel, Denoising Diffusion Probabilistic Models, NeurIPS, 2020.
+[4] Rombach et al., High-Resolution Image Synthesis with Latent Diffusion Models, CVPR, 2022.
+[5] Peebles and Xie, Scalable Diffusion Models with Transformers, ICCV, 2023.
+[6] Zhang, Rao, Agrawala, Adding Conditional Control to T2I Diffusion Models (ControlNet), ICCV, 2023.
+[7] Brooks, Holynski, Efros, InstructPix2Pix, CVPR, 2023.
+[8] Hertz et al., Prompt-to-Prompt Image Editing, ICLR, 2023.
+[9] Meng et al., SDEdit, ICLR, 2022.
+[10] Saharia et al., Palette: Image-to-Image Diffusion Models, SIGGRAPH, 2022.
+[11] Hu et al., LoRA: Low-Rank Adaptation of Large Language Models, ICLR, 2022.
+
+================================================================================
+SLIDE 19 — REFERENCES (2/2)
+================================================================================
+Title: References
+
+[12] Podell et al., SDXL: Improving Latent Diffusion Models, arXiv:2307.01952, 2023.
+[13] Bai et al., Qwen2.5-VL Technical Report, arXiv:2502.13923, 2025.
+[14] Qwen Team, Qwen-Image Technical Report, arXiv:2508.02324, 2025.
+[15] Li et al., Generative AI Models for Different Steps in Architectural Design: A Literature Review, arXiv:2404.01335, 2024.
+[16] Yeh et al., Automatic Measures for Evaluating Generative Design Methods for Architects, arXiv:2303.11483, 2023.
+[17] Wang et al., Image Quality Assessment: From Error Visibility to Structural Similarity, IEEE TIP, 2004.
+[18] Zhang et al., The Unreasonable Effectiveness of Deep Features as a Perceptual Metric (LPIPS), CVPR, 2018.
+
+================================================================================
+SLIDE 20 — THANK YOU
+================================================================================
+Thank You!
+Questions?
+
+================================================================================
+SPEAKER CUES (NOT ON SLIDES)
+================================================================================
+If they ask “where is the photoreal image?”: 50% proves mapping; worker is next; optional saved screenshot.
+If they ask “did you train Qwen?”: No. Frozen graph, cited reports [13][14].
+If they ask “why EXTC?”: Systems + applied ML pipeline (IPC, job packaging, diffusion I2I), not a new chip.
+Time: ~10–12 min; cut slides 15–16 if needed.
